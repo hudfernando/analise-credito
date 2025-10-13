@@ -24,32 +24,22 @@ export const TabelaResultados = ({ resultados, isPending, isError }: TabelaResul
   const [sortConfig, setSortConfig] = useState<SortConfig>(null);
 
   const sortedResultados = useMemo(() => {
-    // ... (lógica de ordenação continua a mesma)
     if (!resultados) return [];
     let sortableItems = [...resultados];
     if (sortConfig !== null) {
       sortableItems.sort((a, b) => {
         const aValue = a[sortConfig.key];
         const bValue = b[sortConfig.key];
-
         if (aValue === null || bValue === null) return 0;
-        
         const parseCurrency = (value: string) => parseFloat(value.replace('R$', '').replace(/\./g, '').replace(',', '.').trim());
-
         let aComparable: string | number = aValue;
         let bComparable: string | number = bValue;
-        
         if (typeof aValue === 'string' && aValue.includes('R$')) {
             aComparable = parseCurrency(aValue);
             bComparable = parseCurrency(bValue as string);
         }
-
-        if (aComparable < bComparable) {
-          return sortConfig.direction === 'asc' ? -1 : 1;
-        }
-        if (aComparable > bComparable) {
-          return sortConfig.direction === 'asc' ? 1 : -1;
-        }
+        if (aComparable < bComparable) return sortConfig.direction === 'asc' ? -1 : 1;
+        if (aComparable > bComparable) return sortConfig.direction === 'asc' ? 1 : -1;
         return 0;
       });
     }
@@ -57,7 +47,6 @@ export const TabelaResultados = ({ resultados, isPending, isError }: TabelaResul
   }, [resultados, sortConfig]);
 
   const handleSort = (key: keyof ResultadoEnriquecido) => {
-    // ... (lógica de handleSort continua a mesma)
     let direction: 'asc' | 'desc' = 'asc';
     if (sortConfig && sortConfig.key === key && sortConfig.direction === 'asc') {
       direction = 'desc';
@@ -71,11 +60,13 @@ export const TabelaResultados = ({ resultados, isPending, isError }: TabelaResul
     const dataToExport = sortedResultados.map(item => ({
       'Cliente ID': item.clienteId,
       'Nome do Cliente': item.nomeCliente,
+      // >>>>>>>> NOVA LINHA ADICIONADA AQUI <<<<<<<<<<
+      'Situação de Crédito': item.situacaoCredito,
       'Classificação (Nome)': item.classificacaoNome,
       'Classificação (Estrelas)': item.classificacaoEstrelas,
       'Score de Risco (1-10)': item.scoreRisco,
       'Score de Valor (1-10)': item.scoreValor,
-      'Alerta': item.alerta ?? '', // Usa string vazia se o alerta for nulo
+      'Alerta': item.alerta ?? '',
       'Perfil do Pagador': item.perfilPagador,
       'Saldo Devedor': item.saldoDevedor,
       'Limite de Crédito': item.limiteDeCredito,
@@ -87,14 +78,9 @@ export const TabelaResultados = ({ resultados, isPending, isError }: TabelaResul
       'Atraso Médio (dias)': item.atrasoMedioDias,
       'Maior Compra': item.maiorCompra,
       'Compras (90d)': item.compras90Dias,
-
-      // ==================> INÍCIO DA CORREÇÃO <==================
-      // Adiciona um valor padrão 'R$ 0,00' se os dados estiverem nulos ou indefinidos
       'Média Compra (90d)': item.mediaCompra90Dias ?? 'R$ 0,00',
       'Vencimento (7d)': item.vencimento7Dias ?? 'R$ 0,00',
-      // Para a porcentagem, usa 'N/A' (Não Aplicável) se o valor for nulo
       'Utilização do Limite (%)': item.utilizacaoLimite !== null ? item.utilizacaoLimite.toFixed(2) : 'N/A',
-      // ==================> FIM DA CORREÇÃO <==================
     }));
 
     const worksheet = XLSX.utils.json_to_sheet(dataToExport);
@@ -110,7 +96,6 @@ export const TabelaResultados = ({ resultados, isPending, isError }: TabelaResul
     <TooltipProvider>
       <div className="mt-6">
         <TabelaStatus isPending={isPending} isError={isError} hasData={hasData} />
-
         {showTable && (
           <>
             <TabelaActions onExport={handleExport} />
