@@ -1,149 +1,134 @@
 import { AnaliseCreditoResultado } from "@/types/analise-credito";
 
-// 1. Adicionar o novo fator de desconto na interface de configurações
-export interface AnaliseSettings {
-  limiteUtilizacaoAlto: number;
-  atrasoLeveDias: number;
-  atrasoCriticoDias: number;
-  pesoUtilizacao: number;
-  pesoTitulosVencidos: number;
-  pesoAtrasoMedio: number;
-  pesoValor: number;
-  pesoRisco: number;
-  fatorDescontoBomComportamento: number; // Ex: 0.75 para 75% de desconto
-}
 
-export type ResultadoEnriquecido = AnaliseCreditoResultado & {
-  utilizacaoLimite: number | null;
+// CORREÇÃO: Interface alinhada com a estrutura do seu projeto.
+export interface ResultadoEnriquecido extends AnaliseCreditoResultado {
+  utilizacaoLimite: number;
   perfilPagador: string;
   scoreRisco: number;
   scoreValor: number;
-  classificacaoEstrelas: number;
-  classificacaoNome: string;
-  alerta: string | null;
-};
+  classificacaoEstrelas: number; // <-- Propriedade requerida
+  classificacaoNome: string; // <-- Propriedade relacionada
+  alerta: string | null; // <-- Propriedade requerida
+}
 
-// 2. Adicionar o valor padrão para o novo fator
+// ATUALIZAÇÃO: Interface de configurações expandida para controlar toda a análise.
+export interface AnaliseSettings {
+  // Pesos para o cálculo do Score de Risco (0 a 1)
+  pesosScoreRisco: {
+    utilizacaoLimite: number;
+    titulosVencidos: number;
+    atrasoMedio: number;
+  };
+  // Divisores para normalizar os fatores de Risco e Valor
+  fatores: {
+    divisorUtilizacaoRisco: number; // a cada X % de uso, aumenta o risco
+    multiplicadorVencidosRisco: number; // X pontos por título vencido
+    divisorAtrasoRisco: number; // a cada X dias de atraso, aumenta o risco
+    divisorFrequenciaValor: number; // a cada X compras, aumenta o valor
+    divisorTicketMedioValor: number; // a cada R$ X de ticket, aumenta o valor
+  };
+  // Limites para a classificação em estrelas com base no IVE
+  limitesIVE: {
+    estrela5: number; // IVE >= X -> 5 estrelas
+    estrela4: number; // IVE >= X -> 4 estrelas
+    estrela3: number; // IVE >= X -> 3 estrelas
+    estrela2: number; // IVE >= X -> 2 estrelas
+  };
+  // Limites para a geração de alertas
+  limitesAlerta: {
+    utilizacaoCredito: number; // Alerta se utilização for > X%
+    diasAtrasoCritico: number; // Alerta se tiver títulos vencidos a mais de X dias
+  }
+}
+
+// ATUALIZAÇÃO: Valores padrão para a nova estrutura de configurações
 export const defaultSettings: AnaliseSettings = {
-  limiteUtilizacaoAlto: 85,
-  atrasoLeveDias: 5,
-  atrasoCriticoDias: 30,
-  pesoUtilizacao: 5,
-  pesoTitulosVencidos: 3,
-  pesoAtrasoMedio: 2,
-  pesoValor: 1.0,
-  pesoRisco: 1.5,
-  fatorDescontoBomComportamento: 0.75, // Desconto padrão de 75%
+  pesosScoreRisco: {
+    utilizacaoLimite: 0.4,
+    titulosVencidos: 0.4,
+    atrasoMedio: 0.2,
+  },
+  fatores: {
+    divisorUtilizacaoRisco: 10,
+    multiplicadorVencidosRisco: 2,
+    divisorAtrasoRisco: 5,
+    divisorFrequenciaValor: 2,
+    divisorTicketMedioValor: 500,
+  },
+  limitesIVE: {
+    estrela5: 4,
+    estrela4: 1,
+    estrela3: -2,
+    estrela2: -5,
+  },
+  limitesAlerta: {
+    utilizacaoCredito: 95,
+    diasAtrasoCritico: 60,
+  }
 };
 
-const parseCurrency = (value: string | number): number => {
-  if (typeof value === 'number') return value;
-  return parseFloat(value.replace('R$', '').replace(/\./g, '').replace(',', '.').trim());
-};
-
+// ATUALIZAÇÃO: A função agora é 100% controlada pelo objeto 'settings'
 export function performAnalysis(
   data: AnaliseCreditoResultado[],
   settings: AnaliseSettings
 ): ResultadoEnriquecido[] {
-  if (!data) return [];
-
-  // Mapeia o código da situação de crédito para um nome mais descritivo
-  const situacaoMap: { [key: string]: string } = {
-    DP: 'Depósito Antecipado',
-    RECA: 'Recadastro Pendente',
-    BL: 'Bloqueado',
-    JU: 'Jurídico',
-    TJ: 'Protestado',
-    PRCA: 'Pré-Cadastro',
-  };
-
-  return data.map(cliente => {
-    // --- LÓGICA DE PARSING (sem alteração) ---
-    const saldoDevedor = parseCurrency(cliente.saldoDevedor);
-    const limiteCredito = parseCurrency(cliente.limiteDeCredito);
-    const utilizacaoLimite = limiteCredito > 0 ? (saldoDevedor / limiteCredito) * 100 : null;
-
-    // ======================= REGRA DE PRIORIDADE PELA SITUAÇÃO =======================
-    const situacaoCliente = cliente.situacaoCredito.trim().toUpperCase();
-    const situacoesCriticas = ['DP', 'RECA', 'BL', 'JU', 'TJ', 'PRCA'];
-
-    if (situacoesCriticas.includes(situacaoCliente)) {
-      return {
-        ...cliente,
-        utilizacaoLimite: utilizacaoLimite,
-        perfilPagador: situacaoMap[situacaoCliente] || 'Crítico',
-        scoreRisco: 10, // Risco máximo
-        scoreValor: 0,  // Valor mínimo
-        classificacaoEstrelas: 1,
-        classificacaoNome: `Cliente Crítico (${situacaoMap[situacaoCliente]})`,
-        alerta: `Atenção: Cliente com status "${situacaoMap[situacaoCliente]}"`,
-      };
-    }
-    // ============================ FIM DA NOVA REGRA ===============================
-
-    // Se o cliente não tem uma situação crítica, a análise continua normalmente...
+  return data.map((cliente) => {
+    const utilizacaoLimite = cliente.limiteCredito > 0 ? (cliente.saldoDevedor / cliente.limiteCredito) * 100 : 0;
+    const perfilPagador = cliente.atrasoMedioDias > 30 ? 'Atraso Crítico' : cliente.atrasoMedioDias > 5 ? 'Pontual' : 'Bom Pagador';
     
-    let perfilPagador = 'Pontual';
-    if (cliente.atrasoMedioDias < 0) perfilPagador = 'Antecipado';
-    else if (cliente.atrasoMedioDias > settings.atrasoCriticoDias) perfilPagador = 'Atraso Crítico';
-    else if (cliente.atrasoMedioDias > settings.atrasoLeveDias) perfilPagador = 'Atraso Leve';
+    // Score de Risco calculado com base nos settings
+    const riscoUtilizacao = Math.min(utilizacaoLimite / settings.fatores.divisorUtilizacaoRisco, 10);
+    const riscoVencidos = Math.min(cliente.titulosVencidos * settings.fatores.multiplicadorVencidosRisco, 10);
+    const riscoAtraso = Math.min(cliente.atrasoMedioDias / settings.fatores.divisorAtrasoRisco, 10);
+    const scoreRiscoBruto = (riscoUtilizacao * settings.pesosScoreRisco.utilizacaoLimite) + (riscoVencidos * settings.pesosScoreRisco.titulosVencidos) + (riscoAtraso * settings.pesosScoreRisco.atrasoMedio);
+    const scoreRisco = Math.max(1, Math.min(10, Math.ceil(scoreRiscoBruto)));
 
-    // ... (O restante da lógica de cálculo de score, IVE, estrelas e alertas continua o mesmo) ...
-    let pontuacaoUtilizacao;
-    if (utilizacaoLimite === null || utilizacaoLimite <= 0) {
-        pontuacaoUtilizacao = 0;
-    } else {
-        const utilizacaoRatio = utilizacaoLimite / 100;
-        pontuacaoUtilizacao = Math.min(Math.pow(utilizacaoRatio, 2) * 10, 10);
-    }
-    const pontuacaoTitulosVencidos = Math.min(cliente.titulosVencidos / 5, 1) * 10;
-    const pontuacaoAtrasoMedio = Math.min(cliente.atrasoMedioDias / 60, 1) * 10;
-    if (cliente.titulosVencidos === 0 && cliente.diasDoVencidoMaisAntigo === 0) {
-        pontuacaoUtilizacao *= (1 - settings.fatorDescontoBomComportamento);
-    }
-    const totalPesosRisco = settings.pesoUtilizacao + settings.pesoTitulosVencidos + settings.pesoAtrasoMedio;
-    let scoreRisco = ((pontuacaoUtilizacao * settings.pesoUtilizacao) + (pontuacaoTitulosVencidos * settings.pesoTitulosVencidos) + (pontuacaoAtrasoMedio * settings.pesoAtrasoMedio)) / totalPesosRisco;
-    const mediaCompra = parseCurrency(cliente.mediaCompra90Dias);
-    const pontuacaoFrequencia = Math.min(cliente.compras90Dias / 10, 1) * 10;
-    const pontuacaoMediaCompra = Math.min(mediaCompra / 5000, 1) * 10;
-    let scoreValor = (pontuacaoFrequencia + pontuacaoMediaCompra) / 2;
-    const ive = (scoreValor * settings.pesoValor) - (scoreRisco * settings.pesoRisco);
+    // Score de Valor calculado com base nos settings
+    const valorFrequencia = Math.min(cliente.compras90Dias / settings.fatores.divisorFrequenciaValor, 5);
+    const valorTicketMedio = Math.min(cliente.mediaCompra90Dias / settings.fatores.divisorTicketMedioValor, 5);
+    const scoreValorBruto = valorFrequencia + valorTicketMedio;
+    const scoreValor = Math.max(1, Math.min(10, Math.ceil(scoreValorBruto)));
+
+    // Classificação em Estrelas com base nos settings
+    const IVE = scoreValor - scoreRisco;
     let classificacaoEstrelas: number;
     let classificacaoNome: string;
-    if (ive > 5.0) {
-        classificacaoEstrelas = 5; classificacaoNome = 'Cliente Elite (AAA)';
-    } else if (ive > 2.0) {
-        classificacaoEstrelas = 4; classificacaoNome = 'Cliente Sólido (AA)';
-    } else if (ive > -1.0) {
-        classificacaoEstrelas = 3; classificacaoNome = 'Cliente Neutro (A)';
-    } else if (ive > -4.0) {
-        classificacaoEstrelas = 2; classificacaoNome = 'Cliente de Risco (B)';
+
+    if (IVE >= settings.limitesIVE.estrela5) {
+      classificacaoEstrelas = 5; classificacaoNome = 'Cliente Estrela';
+    } else if (IVE >= settings.limitesIVE.estrela4) {
+      classificacaoEstrelas = 4; classificacaoNome = 'Bom Potencial';
+    } else if (IVE >= settings.limitesIVE.estrela3) {
+      classificacaoEstrelas = 3; classificacaoNome = 'Neutro';
+    } else if (IVE >= settings.limitesIVE.estrela2) {
+      classificacaoEstrelas = 2; classificacaoNome = 'Atenção';
     } else {
-        classificacaoEstrelas = 1; classificacaoNome = 'Cliente Crítico (C)';
+      classificacaoEstrelas = 1; classificacaoNome = 'Alto Risco';
     }
-    if (saldoDevedor === 0 && cliente.compras90Dias === 0) {
-        classificacaoNome = 'Cliente Inativo';
-        classificacaoEstrelas = 0;
-        scoreRisco = 0;
-        scoreValor = 0;
-        perfilPagador = 'Sem Histórico Recente';
+    
+    if (['BL', 'JU', 'TJ', 'DP'].includes(cliente.situacaoCredito.trim().toUpperCase())) {
+        classificacaoEstrelas = 1;
+        classificacaoNome = 'Crítico';
     }
-    let alerta = null;
-    if (utilizacaoLimite && utilizacaoLimite > 110) {
-        alerta = 'Cliente operando acima do limite!';
-    } else if (cliente.diasDoVencidoMaisAntigo > 60) {
-        alerta = 'Possui dívida antiga em aberto.';
+    if (cliente.saldoDevedor === 0 && cliente.compras90Dias === 0) {
+      classificacaoEstrelas = 0; classificacaoNome = 'Inativo';
+    }
+
+    // Alertas com base nos settings
+    let alerta: string | null = null;
+    if (cliente.situacaoCredito.toUpperCase() === 'BL') {
+      alerta = 'Cliente Bloqueado!';
+    } else if (cliente.diasVencidoMaisAntigo > settings.limitesAlerta.diasAtrasoCritico) {
+      alerta = `Atraso superior a ${settings.limitesAlerta.diasAtrasoCritico} dias.`;
+    } else if (utilizacaoLimite > settings.limitesAlerta.utilizacaoCredito) {
+      alerta = `Limite de crédito quase esgotado (${Math.round(utilizacaoLimite)}%).`;
     }
 
     return {
       ...cliente,
-      utilizacaoLimite: utilizacaoLimite,
-      perfilPagador: perfilPagador,
-      scoreRisco: scoreRisco,
-      scoreValor: scoreValor,
-      classificacaoEstrelas: classificacaoEstrelas,
-      classificacaoNome: classificacaoNome,
-      alerta: alerta,
+      utilizacaoLimite, perfilPagador, scoreRisco, scoreValor,
+      classificacaoEstrelas, classificacaoNome, alerta,
     };
   });
 }

@@ -11,21 +11,22 @@ export interface AnaliseCreditoFiltros {
   dataFinal?: string;
 }
 
-// Estrutura dos dados recebidos da API
+// Interface que espelha o DTO que vem do backend (ASP.NET Core)
+// Adicionamos os novos campos aqui.
 export interface AnaliseCreditoResultado {
   clienteId: number;
   nomeCliente: string;
   situacaoCredito: string;
-  limiteDeCredito: string;
-  saldoDevedor: string;
-  saldoParaCompras: string;
+  limiteCredito: number;
+  saldoDevedor: number;
+  saldoParaCompras: number;
+  notasDeCredito: number;
   titulosVencidos: number;
   titulosAVencer: number;
-  notasDeCredito: string;
-  diasDoVencidoMaisAntigo: number;
+  diasVencidoMaisAntigo: number;
   atrasoMedioDias: number;
-  maiorCompra: string;
+  maiorCompra: number;
   compras90Dias: number;
-  mediaCompra90Dias: string;
-  vencimento7Dias: string;
+  mediaCompra90Dias: number;
+  vencimento7Dias: number;
 }

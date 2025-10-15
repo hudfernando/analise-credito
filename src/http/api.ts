@@ -5,6 +5,7 @@ import { AnaliseCreditoFiltros, AnaliseCreditoResultado } from '@/types/analise-
 
 const api = ky.create({
   prefixUrl: 'https://localhost:7286/api', // IMPORTANTE: Verifique se a URL da sua API está correta!
+  timeout: 30000,
 });
 
 // Função que busca os dados da análise de crédito
