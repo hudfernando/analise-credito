@@ -1,40 +1,69 @@
+// Caminho: src/components/analise/tabela-resultados/TabelaHeader.tsx
+
+'use client';
+
 import { TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ResultadoEnriquecido } from "@/lib/analise";
+import { Button } from "@/components/ui/button";
 import { ArrowUpDown } from "lucide-react";
 
+// --- MUDANÇA AQUI ---
+// Importamos nosso novo e único tipo de dados.
+import { AnaliseCompleta } from "@/types/analise-credito";
+
+// Definimos as chaves que podem ser usadas para ordenação.
+type SortableKeys = keyof AnaliseCompleta;
+
+type SortConfig = { 
+  key: SortableKeys; 
+  direction: 'asc' | 'desc'; 
+} | null;
+
 interface TabelaHeaderProps {
-  onSort: (key: keyof ResultadoEnriquecido) => void;
+  onSort: (key: SortableKeys) => void;
+  sortConfig: SortConfig;
 }
 
-// Componente auxiliar para criar um cabeçalho de tabela clicável
-const SortableHeader = ({ onSort, sortKey, children, className }: { onSort: TabelaHeaderProps['onSort'], sortKey: keyof ResultadoEnriquecido, children: React.ReactNode, className?: string }) => (
-  <TableHead className={`cursor-pointer ${className}`} onClick={() => onSort(sortKey)}>
-    {children} <ArrowUpDown className="inline-block ml-1 h-3 w-3" />
-  </TableHead>
-);
+// Componente auxiliar para criar um cabeçalho de coluna ordenável
+const SortableHeader = ({ 
+  children, 
+  columnKey,
+  onSort,
+  sortConfig
+}: { 
+  children: React.ReactNode; 
+  columnKey: SortableKeys;
+  onSort: (key: SortableKeys) => void;
+  sortConfig: SortConfig;
+}) => {
+  const isSorted = sortConfig?.key === columnKey;
+  const direction = isSorted ? sortConfig.direction : null;
 
-export const TabelaHeader = ({ onSort }: TabelaHeaderProps) => {
+  return (
+    <TableHead>
+      <Button variant="ghost" onClick={() => onSort(columnKey)}>
+        {children}
+        <ArrowUpDown className={`ml-2 h-4 w-4 ${isSorted ? '' : 'text-muted-foreground'}`} />
+      </Button>
+    </TableHead>
+  );
+};
+
+
+export const TabelaHeader = ({ onSort, sortConfig }: TabelaHeaderProps) => {
   return (
     <TableHeader>
       <TableRow>
-        <SortableHeader onSort={onSort} sortKey="nomeCliente" className="w-[250px] ">Cliente</SortableHeader>
-        <SortableHeader onSort={onSort} sortKey="situacaoCredito">Situação Crédito</SortableHeader>
-        <SortableHeader onSort={onSort} sortKey="classificacaoEstrelas">Classificação</SortableHeader>
-        <SortableHeader onSort={onSort} sortKey="scoreRisco" className="text-center">Scores (Risco/Valor)</SortableHeader>
-        <SortableHeader onSort={onSort} sortKey="perfilPagador">Perfil Pagador</SortableHeader>
-        <SortableHeader onSort={onSort} sortKey="saldoDevedor" className="text-right">Saldo Devedor</SortableHeader>
-        <SortableHeader onSort={onSort} sortKey="limiteCredito" className="text-right">Limite</SortableHeader>
-        <SortableHeader onSort={onSort} sortKey="atrasoMedioDias" className="text-right">Atraso Médio</SortableHeader>
-
-        {/* ===== COLUNAS ADICIONADAS A PARTIR DAQUI ===== */}
-        <SortableHeader onSort={onSort} sortKey="saldoParaCompras" className="text-right">Saldo p/ Compras</SortableHeader>
-        <SortableHeader onSort={onSort} sortKey="titulosVencidos" className="text-center">Tít. Vencidos</SortableHeader>
-        <SortableHeader onSort={onSort} sortKey="titulosAVencer" className="text-center">Tít. a Vencer</SortableHeader>
-        <SortableHeader onSort={onSort} sortKey="diasVencidoMaisAntigo" className="text-right">Venc. Mais Antigo</SortableHeader>
-        <SortableHeader onSort={onSort} sortKey="maiorCompra" className="text-right">Maior Compra</SortableHeader>
-        <SortableHeader onSort={onSort} sortKey="compras90Dias" className="text-center">Compras (90d)</SortableHeader>
-        <SortableHeader onSort={onSort} sortKey="mediaCompra90Dias" className="text-right">Média Compra (90d)</SortableHeader>
-        <SortableHeader onSort={onSort} sortKey="vencimento7Dias" className="text-right">Venc. (7d)</SortableHeader>
+        {/* Mapeamos as novas colunas para o nosso cabeçalho ordenável */}
+        <SortableHeader columnKey="clienteId" onSort={onSort} sortConfig={sortConfig}>Cliente</SortableHeader>
+        <SortableHeader columnKey="nomeCliente" onSort={onSort} sortConfig={sortConfig}>Nome do Cliente</SortableHeader>
+        <SortableHeader columnKey="situacaoCredito" onSort={onSort} sortConfig={sortConfig}>Situação</SortableHeader>
+        <SortableHeader columnKey="classificacaoEstrelas" onSort={onSort} sortConfig={sortConfig}>Classificação</SortableHeader>
+        <SortableHeader columnKey="segmento" onSort={onSort} sortConfig={sortConfig}>Segmento</SortableHeader>
+        <SortableHeader columnKey="scoreRisco" onSort={onSort} sortConfig={sortConfig}>Score Risco</SortableHeader>
+        <SortableHeader columnKey="scoreValor" onSort={onSort} sortConfig={sortConfig}>Score Valor</SortableHeader>
+        <SortableHeader columnKey="ive" onSort={onSort} sortConfig={sortConfig}>IVE</SortableHeader>
+        <SortableHeader columnKey="saldoDevedor" onSort={onSort} sortConfig={sortConfig}>Saldo Devedor</SortableHeader>
+        <SortableHeader columnKey="compras90Dias" onSort={onSort} sortConfig={sortConfig}>Compras (90d)</SortableHeader>
       </TableRow>
     </TableHeader>
   );

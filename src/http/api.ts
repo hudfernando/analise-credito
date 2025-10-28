@@ -1,46 +1,81 @@
-// lib/api.ts ou http/api.ts
+// Caminho: src/lib/api.ts
 
 import ky from 'ky';
-import { AnaliseCreditoFiltros, AnaliseCreditoResultado } from '@/types/analise-credito';
+import { 
+  AnaliseCreditoFiltros, 
+  AnaliseCompleta, 
+  DashboardSummary, 
+  PaginatedResponse ,
+  Configuracao,
+  DistribuicaoDto,
+  TopClienteDto
+} from '@/types/analise-credito';
 
 const api = ky.create({
-  prefixUrl: 'https://localhost:7286/api', // IMPORTANTE: Verifique se a URL da sua API está correta!
-  timeout: 30000,
+  prefixUrl: process.env.NEXT_PUBLIC_API_URL,
+  timeout: 60000, // Timeout de 60 segundos
 });
 
-// Função que busca os dados da análise de crédito
-export const fetchAnaliseCredito = async (
-  filtros: AnaliseCreditoFiltros
-): Promise<AnaliseCreditoResultado[]> => {
-
+// Transforma o objeto de filtros em search params, removendo valores nulos/vazios
+const createSearchParams = (filters: AnaliseCreditoFiltros): URLSearchParams => {
   const searchParams = new URLSearchParams();
-
-  // ==================> INÍCIO DA CORREÇÃO <==================
-  // Verifica se clienteIds existe e se é um array antes de usar o forEach
-  if (filtros.clienteIds && Array.isArray(filtros.clienteIds) && filtros.clienteIds.length > 0) {
-    // Adiciona o tipo explícito 'number' para o parâmetro 'id'
-    filtros.clienteIds.forEach((id: number) => {
-      searchParams.append('ClienteIds', id.toString());
-    });
-  }
-  // ==================> FIM DA CORREÇÃO <==================
-
-  if (filtros.vendedorCodigo) {
-    searchParams.append('VendedorCodigo', filtros.vendedorCodigo);
-  }
-  if (filtros.grupoCodigo) {
-    searchParams.append('GrupoCodigo', filtros.grupoCodigo);
-  }
-  if (filtros.comNotaDeCredito) {
-    searchParams.append('ComNotaDeCredito', 'true');
-  }
-  if (filtros.dataInicial) {
-    searchParams.append('DataInicial', filtros.dataInicial);
-  }
-  if (filtros.dataFinal) {
-    searchParams.append('DataFinal', filtros.dataFinal);
-  }
-
-  const resultados = await api.get('credito', { searchParams }).json<AnaliseCreditoResultado[]>();
-  return resultados;
+  Object.entries(filters).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== '') {
+      searchParams.append(key, String(value));
+    }
+  });
+  return searchParams;
 };
+
+
+// --- NOVA FUNÇÃO ---
+// Busca os dados agregados para o resumo do dashboard.
+export async function fetchDashboardSummary(filters: AnaliseCreditoFiltros): Promise<DashboardSummary> {
+  const searchParams = createSearchParams(filters);
+  return await api.get('dashboard/summary', { searchParams }).json<DashboardSummary>();
+}
+
+
+// --- FUNÇÃO ATUALIZADA ---
+// Busca a lista detalhada e paginada de clientes com a análise completa.
+export async function fetchAnaliseCredito(filters: AnaliseCreditoFiltros): Promise<PaginatedResponse<AnaliseCompleta>> {
+  const searchParams = createSearchParams(filters);
+  return await api.get('credito', { searchParams }).json<PaginatedResponse<AnaliseCompleta>>();
+}
+
+// --- NOVAS FUNÇÕES ---
+
+// Busca a lista atual de pesos de configuração da API.
+export async function fetchConfiguracoes(): Promise<Configuracao[]> {
+  return await api.get('configuracao').json<Configuracao[]>();
+}
+
+// Envia a lista atualizada de pesos para a API salvar.
+export async function updateConfiguracoes(configs: Configuracao[]): Promise<void> {
+  // O método PUT envia o corpo da requisição como JSON.
+  await api.put('configuracao', { json: configs });
+}
+
+// Busca os dados para o gráfico de distribuição por classificação (estrelas).
+export async function fetchDistribuicaoClassificacao(filters: AnaliseCreditoFiltros): Promise<DistribuicaoDto[]> {
+  const searchParams = createSearchParams(filters);
+  return await api.get('dashboard/distribuicao-classificacao', { searchParams }).json<DistribuicaoDto[]>();
+}
+
+// Busca os dados para o gráfico de distribuição por segmento.
+export async function fetchDistribuicaoSegmento(filters: AnaliseCreditoFiltros): Promise<DistribuicaoDto[]> {
+  const searchParams = createSearchParams(filters);
+  return await api.get('dashboard/distribuicao-segmento', { searchParams }).json<DistribuicaoDto[]>();
+}
+
+// Busca os Top 5 clientes por maior valor (IVE).
+export async function fetchTopClientesValor(filters: AnaliseCreditoFiltros): Promise<TopClienteDto[]> {
+  const searchParams = createSearchParams(filters);
+  return await api.get('dashboard/top-clientes-valor', { searchParams }).json<TopClienteDto[]>();
+}
+
+// Busca os Top 5 clientes por maior risco (Prob. Inadimplência).
+export async function fetchTopClientesRisco(filters: AnaliseCreditoFiltros): Promise<TopClienteDto[]> {
+  const searchParams = createSearchParams(filters);
+  return await api.get('dashboard/top-clientes-risco', { searchParams }).json<TopClienteDto[]>();
+}

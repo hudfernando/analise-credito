@@ -1,91 +1,74 @@
+// Caminho: src/components/analise/FiltrosForm.tsx
+
 'use client';
 
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Label } from '@/components/ui/label';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
+import { useState } from 'react';
 import { AnaliseCreditoFiltros } from '@/types/analise-credito';
-import { Search, Loader2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Loader2 } from 'lucide-react';
 
 interface FiltrosFormProps {
-  filtros: AnaliseCreditoFiltros;
-  // Função para atualizar o estado na página principal
-  setFiltros: React.Dispatch<React.SetStateAction<AnaliseCreditoFiltros>>;
-  handleSearch: () => void; // Função para iniciar a busca
+  onSearch: (filtros: Omit<AnaliseCreditoFiltros, 'pagina' | 'tamanhoPagina'>) => void;
   isSearching: boolean;
-  dataError: string;
 }
 
-// Este agora é um componente "controlado" e mais simples
-export const FiltrosForm = ({
-  filtros,
-  setFiltros,
-  handleSearch,
-  isSearching,
-  dataError,
-}: FiltrosFormProps) => {
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setFiltros(prev => ({ ...prev, [name]: value }));
+export const FiltrosForm = ({ onSearch, isSearching }: FiltrosFormProps) => {
+  // --- CORREÇÃO 1: Alterado o nome do estado para corresponder ao DTO da API ---
+  const [vendedorId, setVendedorId] = useState('');
+  // O campo 'grupoCodigo' foi removido pois não é mais utilizado pelo backend.
+
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    
+    // --- CORREÇÃO 2: A chave do objeto agora é 'VendedorId' ---
+    const filtros: Omit<AnaliseCreditoFiltros, 'pagina' | 'tamanhoPagina'> = {
+      VendedorId: vendedorId || undefined,
+    };
+    
+    onSearch(filtros);
   };
 
-  const handleCheckboxChange = (checked: boolean) => {
-    setFiltros(prev => ({...prev, comNotaDeCredito: checked}))
-  }
-
   return (
-    <Card className="border-azul-claro/20">
+    <Card>
       <CardHeader>
-        <CardTitle className="text-azul-claro">Filtros de Análise</CardTitle>
+        <CardTitle>Filtros de Análise</CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {/* Coluna 1 */}
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="clienteIds">Códigos de Clientes (separados por ,)</Label>
-              <Input id="clienteIds" name="clienteIds" value={filtros.clienteIds as string || ''} onChange={handleInputChange} />
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            
+            {/* --- CORREÇÃO 3: O Input agora usa o estado 'vendedorId' --- */}
+            <div className="space-y-2">
+              <Label htmlFor="vendedor">Código do Vendedor</Label>
+              <Input
+                id="vendedor"
+                placeholder="Ex: AMARILDO"
+                value={vendedorId}
+                onChange={(e) => setVendedorId(e.target.value)}
+                disabled={isSearching}
+              />
             </div>
-            <div>
-              <Label htmlFor="vendedorCodigo">Código do Vendedor</Label>
-              <Input id="vendedorCodigo" name="vendedorCodigo" value={filtros.vendedorCodigo || ''} onChange={handleInputChange} />
-            </div>
+
+            {/* O campo para 'Código do Grupo' foi removido para alinhar com a API. */}
+
           </div>
-          {/* Coluna 2 */}
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="grupoCodigo">Código do Grupo</Label>
-              <Input id="grupoCodigo" name="grupoCodigo" value={filtros.grupoCodigo || ''} onChange={handleInputChange} />
-            </div>
-             <div className="flex items-center space-x-2 pt-8">
-                <Checkbox id="comNotaDeCredito" name="comNotaDeCredito" checked={filtros.comNotaDeCredito} onCheckedChange={handleCheckboxChange} />
-                <Label htmlFor="comNotaDeCredito">Apenas com Nota de Crédito</Label>
-            </div>
+
+          <div className="flex justify-end">
+            <Button type="submit" disabled={isSearching}>
+              {isSearching ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Buscando...
+                </>
+              ) : (
+                'Buscar'
+              )}
+            </Button>
           </div>
-          {/* Coluna 3 */}
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="dataInicial">Data Inicial (DDMMYYYY)</Label>
-              <Input id="dataInicial" name="dataInicial" value={filtros.dataInicial || ''} onChange={handleInputChange} />
-            </div>
-            <div>
-              <Label htmlFor="dataFinal">Data Final (DDMMYYYY)</Label>
-              <Input id="dataFinal" name="dataFinal" value={filtros.dataFinal || ''} onChange={handleInputChange} />
-            </div>
-             {dataError && <p className="text-red-500 text-sm">{dataError}</p>}
-          </div>
-        </div>
-        <div className="mt-6 flex justify-end">
-          <Button onClick={handleSearch} disabled={isSearching} className="bg-azul-claro text-azul-escuro hover:bg-azul-claro/90 w-[120px]">
-            {isSearching ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Search className="mr-2 h-4 w-4" />
-            )}
-            {isSearching ? 'Buscando' : 'Buscar'}
-          </Button>
-        </div>
+        </form>
       </CardContent>
     </Card>
   );

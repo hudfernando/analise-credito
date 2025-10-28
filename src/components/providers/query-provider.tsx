@@ -1,13 +1,19 @@
-// components/providers/query-provider.tsx
+// Caminho: src/components/providers/QueryProvider.tsx
+
 'use client';
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { useState } from 'react';
+import React from 'react';
 
-export const QueryProvider = ({ children }: { children: React.ReactNode }) => {
-  const [queryClient] = useState(() => new QueryClient());
+// Criamos uma única instância do QueryClient para toda a aplicação.
+const queryClient = new QueryClient();
 
+// Este é o nosso componente Provider.
+// Ele recebe 'children', que serão as páginas e outros componentes da nossa aplicação.
+export function QueryProvider({ children }: { children: React.ReactNode }) {
   return (
-    <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    <QueryClientProvider client={queryClient}>
+      {children}
+    </QueryClientProvider>
   );
-};
+}

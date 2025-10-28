@@ -1,133 +1,68 @@
+// Caminho: src/app/page.tsx
 'use client';
 
-import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { fetchAnaliseCredito } from '@/http/api';
-import { AnaliseCreditoFiltros, AnaliseCreditoResultado } from '@/types/analise-credito';
+import Link from 'next/link';
+import { useFilterStore } from '@/store/use-filter-store';
+import { AnaliseCreditoFiltros } from '@/types/analise-credito';
+import { fetchDashboardSummary, fetchDistribuicaoClassificacao, fetchDistribuicaoSegmento, fetchTopClientesValor, fetchTopClientesRisco } from '@/http/api';
 import { FiltrosForm } from '@/components/analise/FiltrosForm';
-import { TabelaResultados } from '@/components/analise/TabelaResultados';
-// ATUALIZAÇÃO: Importando também AnaliseSettings e o componente Configuracoes
-import { performAnalysis, defaultSettings, ResultadoEnriquecido, AnaliseSettings } from '@/lib/analise';
-import { Legenda } from "@/components/analise/Legenda";
-// NOVO: Importando o componente de Configurações e o ícone
-import { Configuracoes } from '@/components/analise/Configuracoes';
+import { DashboardSummaryView } from '@/components/dashboard/DashboardSummary';
+import { GraficoDeDistribuicao } from '@/components/dashboard/GraficoDeDistribuicao';
+import { ListaTopClientes } from '@/components/dashboard/ListaTopClientes';
+import { LegendaInsights } from '@/components/documentacao/LegendaInsights';
+import { PainelConfiguracoes } from '@/components/configuracao/PainelConfiguracoes';
 import { Button } from '@/components/ui/button';
-import { Cog,BookOpen  } from 'lucide-react';
-import { DocumentacaoSistema } from '@/components/analise/DocumentacaoSistema';
+import { Settings, ExternalLink } from 'lucide-react';
+import { Toaster } from "@/components/ui/sonner";
 
+export default function DashboardPage() {
+  const { filtros, isSearchActive, setFiltros, setIsSearchActive } = useFilterStore();
 
-export default function HomePage() {
-  const [filtros, setFiltros] = useState<AnaliseCreditoFiltros>({});
-  const [dataError, setDataError] = useState('');
-  const [buscaRealizada, setBuscaRealizada] = useState(false);
+  const { data: summaryData, isLoading: isSummaryLoading } = useQuery({ queryKey: ['dashboardSummary', filtros], queryFn: () => fetchDashboardSummary(filtros), enabled: isSearchActive });
+  const { data: classificacaoData, isLoading: isClassificacaoLoading } = useQuery({ queryKey: ['distribuicaoClassificacao', filtros], queryFn: () => fetchDistribuicaoClassificacao(filtros), enabled: isSearchActive });
+  const { data: segmentoData, isLoading: isSegmentoLoading } = useQuery({ queryKey: ['distribuicaoSegmento', filtros], queryFn: () => fetchDistribuicaoSegmento(filtros), enabled: isSearchActive });
+  const { data: topValorData, isLoading: isTopValorLoading, isError: isTopValorError } = useQuery({ queryKey: ['topClientesValor', filtros], queryFn: () => fetchTopClientesValor(filtros), enabled: isSearchActive });
+  const { data: topRiscoData, isLoading: isTopRiscoLoading, isError: isTopRiscoError } = useQuery({ queryKey: ['topClientesRisco', filtros], queryFn: () => fetchTopClientesRisco(filtros), enabled: isSearchActive });
 
-  // --- INÍCIO DA ATUALIZAÇÃO ---
-  // A constante 'settings' agora é um estado, permitindo que seja alterada.
-  const [settings, setSettings] = useState<AnaliseSettings>(defaultSettings);
-  // NOVO: Estado para controlar a visibilidade do painel de configurações.
-  const [isConfigOpen, setIsConfigOpen] = useState(false);
-  // --- FIM DA ATUALIZAÇÃO ---+
-  const [isDocOpen, setIsDocOpen] = useState(false);
-
-  const { data: rawData, isFetching, isError, refetch } = useQuery<AnaliseCreditoResultado[]>({
-    queryKey: ['analiseCredito', filtros],
-    queryFn: () => {
-      // Sua lógica de tratamento de filtros está perfeita e foi mantida.
-      const filtrosParaApi: Partial<AnaliseCreditoFiltros> = { ...filtros };
-      if (typeof filtros.clienteIds === 'string' && filtros.clienteIds.trim() !== '') {
-        (filtrosParaApi.clienteIds as unknown as number[]) = filtros.clienteIds
-          .split(',')
-          .map((id) => parseInt(id.trim(), 10))
-          .filter((id) => !isNaN(id));
-      } else {
-        delete filtrosParaApi.clienteIds;
-      }
-      return fetchAnaliseCredito(filtrosParaApi as AnaliseCreditoFiltros);
-    },
-    enabled: false,
-    retry: false,
-  });
-
-  const enrichedData = useMemo((): ResultadoEnriquecido[] => {
-    if (!rawData) return [];
-    // A chamada para performAnalysis agora usa o estado 'settings', que é dinâmico.
-    return performAnalysis(rawData, settings);
-  }, [rawData, settings]); // A dependência [settings] já estava aqui, o que é ótimo!
-
-  const handleSearch = () => {
-    // Sua lógica de validação foi mantida.
-    const dateRegex = /^\d{8}$/;
-    if (filtros.dataInicial && !dateRegex.test(filtros.dataInicial.replace(/\D/g, ''))) {
-      setDataError('Data Inicial inválida. Use DDMMYYYY.');
-      return;
-    }
-     if (filtros.dataFinal && !dateRegex.test(filtros.dataFinal.replace(/\D/g, ''))) {
-      setDataError('Data Final inválida. Use DDMMYYYY.');
-      return;
-    }
-    setDataError('');
-    setBuscaRealizada(true);
-    refetch();
+  const handleSearch = (novosFiltros: Omit<AnaliseCreditoFiltros, 'pagina' | 'tamanhoPagina'>) => {
+    setFiltros(novosFiltros);
+    setIsSearchActive(true);
   };
+  
+  const analiseUrl = `/analise?${new URLSearchParams(filtros as Record<string, string>).toString()}`;
 
   return (
-    <main className="container mx-auto p-4 md:p-8">
-      <header className="flex justify-between items-center mb-8">
-          <div className="text-left">
-              <h1 className="text-3xl font-bold tracking-tight text-gray-200">
-                  Análise de Crédito
-              </h1>
-              <p className="text-md text-gray-500 mt-1">
-                  Consulte e analise a situação dos clientes.
-              </p>
-          </div>
-          {/* ATUALIZAÇÃO: Adicionando um contêiner para os botões de ação */}
+    <>
+      <Toaster richColors position="top-right" />
+      <div className="container mx-auto p-4 space-y-8">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <h1 className="text-3xl font-bold">Dashboard Gerencial</h1>
           <div className="flex items-center gap-2">
-            <Legenda />
-            {/* NOVO: Botão que abre o painel de configurações */}
-            <Button variant="outline" onClick={() => setIsConfigOpen(true)}>
-              <Cog className="mr-2 h-4 w-4" />
-              Configurações
-            </Button>
-            {/* NOVO: Botão para abrir a documentação */}
-            <Button variant="outline" onClick={() => setIsDocOpen(true)}>
-              <BookOpen className="mr-2 h-4 w-4" />
-              Documentação
-            </Button>
+              <LegendaInsights />
+              <PainelConfiguracoes><Button variant="outline" size="icon" aria-label="Abrir Configurações"><Settings className="h-4 w-4" /></Button></PainelConfiguracoes>
           </div>
-      </header>
-
-      <FiltrosForm
-        filtros={filtros}
-        setFiltros={setFiltros}
-        handleSearch={handleSearch}
-        isSearching={isFetching}
-        dataError={dataError}
-      />
-
-      {buscaRealizada && (
-        <div className="mt-8">
-          <TabelaResultados
-            resultados={enrichedData}
-            isPending={isFetching}
-            isError={isError}
-          />
         </div>
-      )}
+        
+        <FiltrosForm onSearch={handleSearch} isSearching={isSummaryLoading || isClassificacaoLoading} />
 
-      {/* NOVO: Componente de configurações renderizado aqui */}
-      <Configuracoes
-        isOpen={isConfigOpen}
-        onOpenChange={setIsConfigOpen}
-        settings={settings}
-        onSettingsChange={setSettings}
-      />
-
-      {/* NOVO: Renderização do componente de documentação */}
-      <DocumentacaoSistema
-        isOpen={isDocOpen}
-        onOpenChange={setIsDocOpen}
-      />
-    </main>
+        {isSearchActive && (
+          <>
+            <DashboardSummaryView summaryData={summaryData} isLoading={isSummaryLoading} />
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <GraficoDeDistribuicao title="Distribuição por Classificação" data={classificacaoData} isLoading={isClassificacaoLoading} />
+              <GraficoDeDistribuicao title="Distribuição por Segmento" data={segmentoData} isLoading={isSegmentoLoading} />
+            </div>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <ListaTopClientes title="Top 5 Clientes de Valor (maior IVE)" data={topValorData} isLoading={isTopValorLoading} isError={isTopValorError} />
+                <ListaTopClientes title="Top 5 Clientes de Risco (maior Prob. Inadimplência)" data={topRiscoData} isLoading={isTopRiscoLoading} isError={isTopRiscoError} />
+            </div>
+            <div className="text-center pt-4">
+                <Button asChild size="lg"><Link href={analiseUrl}>Ver Análise Completa da Carteira <ExternalLink className="ml-2 h-4 w-4" /></Link></Button>
+            </div>
+          </>
+        )}
+      </div>
+    </>
   );
 }
