@@ -1,12 +1,17 @@
+// Caminho: src/components/analise/tabela-resultados/TabelaStatus.tsx
+'use client';
+
 import { Loader2, ServerCrash, SearchX } from "lucide-react";
+import React from "react"; // <-- ADICIONADO
 
 interface TabelaStatusProps {
   isPending: boolean;
   isError: boolean;
   hasData: boolean;
+  children: React.ReactNode; // <-- ADICIONADO
 }
 
-export const TabelaStatus = ({ isPending, isError, hasData }: TabelaStatusProps) => {
+export const TabelaStatus = ({ isPending, isError, hasData, children }: TabelaStatusProps) => { // <-- ADICIONADO
   if (isPending) {
     return (
       <div className="flex flex-col items-center justify-center text-center p-10 border border-azul-claro/20 rounded-lg mt-6">
@@ -36,5 +41,6 @@ export const TabelaStatus = ({ isPending, isError, hasData }: TabelaStatusProps)
     );
   }
 
-  return null;
+  // Em vez de retornar null, agora ele retorna os componentes filhos
+  return <>{children}</>; // <-- ADICIONADO
 };

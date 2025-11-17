@@ -1,67 +1,61 @@
-// Caminho: src/app/analise/page.tsx
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import { Suspense, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { useQuery } from '@tanstack/react-query';
-import { fetchAnaliseCredito } from '@/http/api';
 import { TabelaResultados } from '@/components/analise/TabelaResultados';
+import { AnaliseCreditoFiltros } from '@/types/analise-credito';
+import { Skeleton } from '@/components/ui/skeleton';
+
+// --- NOVAS IMPORTAÇÕES ---
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft } from 'lucide-react';
-import { AnaliseCreditoFiltros } from '@/types/analise-credito';
-import { useFilterStore } from '@/store/use-filter-store';
 
-function AnalisePage() {
+// Função auxiliar (permanece a mesma)
+function parseSearchParams(searchParams: URLSearchParams): AnaliseCreditoFiltros {
+  const filtros: AnaliseCreditoFiltros = {};
+  if (searchParams.has('EquipeId')) filtros.EquipeId = searchParams.get('EquipeId')!;
+  if (searchParams.has('VendedorId')) filtros.VendedorId = searchParams.get('VendedorId')!;
+  if (searchParams.has('Estado')) filtros.Estado = searchParams.get('Estado')!;
+  if (searchParams.has('Municipio')) filtros.Municipio = searchParams.get('Municipio')!;
+  if (searchParams.has('classificacaoEstrelas')) {
+    filtros.ClassificacaoEstrelas = parseInt(searchParams.get('classificacaoEstrelas')!, 10);
+  }
+  return filtros;
+}
+
+function AnaliseView() {
   const searchParams = useSearchParams();
-  const { setFiltros, setIsSearchActive } = useFilterStore();
-  
-  const [selectedEstrelas, setSelectedEstrelas] = useState<number | null>(null);
+  const filtrosDaUrl = useMemo(() => parseSearchParams(searchParams), [searchParams]);
+  return <TabelaResultados filtrosIniciais={filtrosDaUrl} />;
+}
 
-  const filtrosDaUrl = useMemo(() => {
-    const params: Omit<AnaliseCreditoFiltros, 'pagina' | 'tamanhoPagina'> = {};
-    if (searchParams.get('VendedorId')) params.VendedorId = searchParams.get('VendedorId')!;
-    if (searchParams.get('EquipeId')) params.EquipeId = searchParams.get('EquipeId')!;
-    if (searchParams.get('Estado')) params.Estado = searchParams.get('Estado')!;
-    if (searchParams.get('Municipio')) params.Municipio = searchParams.get('Municipio')!;
-    if (searchParams.get('classificacaoEstrelas')) {
-        const estrelas = parseInt(searchParams.get('classificacaoEstrelas')!, 10);
-        if (!isNaN(estrelas)) {
-            params.ClassificacaoEstrelas = estrelas;
-        }
-    }
-    return params;
-  }, [searchParams]);
-
-  useEffect(() => {
-    setFiltros(filtrosDaUrl);
-    setIsSearchActive(true);
-  }, [filtrosDaUrl, setFiltros, setIsSearchActive]);
-
-  const { data, isFetching, isError } = useQuery({
-    queryKey: ['analiseCreditoDetalhada', filtrosDaUrl],
-    queryFn: () => fetchAnaliseCredito({ ...filtrosDaUrl, pagina: 1, tamanhoPagina: 10000 }),
-    enabled: true,
-  });
-
+function LoadingState() {
   return (
-    <div className="container mx-auto p-4 space-y-8">
-      <div className="flex items-center gap-4">
-        <Button variant="outline" size="icon" asChild><Link href="/" aria-label="Voltar para o Dashboard"><ArrowLeft className="h-4 w-4" /></Link></Button>
-        <div>
-            <h1 className="text-3xl font-bold">Análise Operacional da Carteira</h1>
-            <p className="text-muted-foreground">Explore os detalhes dos clientes que correspondem aos filtros aplicados no dashboard.</p>
-        </div>
-      </div>
-      <TabelaResultados resultados={data?.itens ?? []} isPending={isFetching} isError={isError} />
+    <div className="space-y-4">
+      <Skeleton className="h-[70vh] w-full" />
     </div>
   );
 }
 
-export default function AnalisePageWrapper() {
+export default function AnalisePage() {
   return (
-    <React.Suspense fallback={<div className="container mx-auto p-4 text-center">Carregando análise...</div>}>
-      <AnalisePage />
-    </React.Suspense>
+    <div className="container mx-auto p-4 md:p-6 space-y-6">
+      {/* --- MUDANÇA APLICADA AQUI --- */}
+      <div className="flex justify-between items-center">
+        <h1 className="text-3xl font-bold tracking-tight">Análise Operacional da Carteira</h1>
+        {/* Botão de Voltar adicionado */}
+        <Button asChild variant="outline">
+          <Link href="/">
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Voltar ao Dashboard
+          </Link>
+        </Button>
+      </div>
+
+      <Suspense fallback={<LoadingState />}>
+        <AnaliseView />
+      </Suspense>
+    </div>
   );
 }

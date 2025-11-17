@@ -1,9 +1,9 @@
-// Caminho: src/components/analise/TabelaResultados.tsx
-
 'use client';
 
-import { useState, useMemo } from 'react';
-import { AnaliseCompleta } from '@/types/analise-credito';
+import React, { useState, useMemo } from 'react';
+import { useInfiniteQuery } from '@tanstack/react-query';
+import { fetchAnaliseCredito } from '@/http/api';
+import { AnaliseCompleta, AnaliseCreditoFiltros } from '@/types/analise-credito';
 import {
     Table,
     TableBody,
@@ -19,18 +19,17 @@ import { Button } from '../ui/button';
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
-import { formatCurrency, formatPercentage } from '@/lib/utils'; // Garanta que as funções de formatação estejam em utils.ts
-import React from 'react'; // Importe o React para usar Fragment
+import { formatCurrency, formatPercentage } from '@/lib/utils';
+import { TabelaFooter } from './tabela-resultados/TabelaFooter';
+import Link from 'next/link';
 
 interface TabelaResultadosProps {
-    resultados: AnaliseCompleta[];
-    isPending: boolean;
-    isError: boolean;
+    filtrosIniciais: AnaliseCreditoFiltros;
 }
 
 type SortableKeys = keyof AnaliseCompleta;
 
-// --- SEUS COMPONENTES AUXILIARES ORIGINAIS (PRESERVADOS) ---
+// --- CORREÇÃO: Garantindo que os componentes retornem JSX ---
 const RenderEstrelas = ({ classificacao }: { classificacao: number }) => (
     <div className="flex items-center">
         {[...Array(5)].map((_, i) => (
@@ -47,12 +46,17 @@ const RenderTendencia = ({ tendencia }: { tendencia: string | null }) => {
         case "Descendo": icon = <TrendingDown className="h-5 w-5 text-red-500" />; break;
         default: icon = <Minus className="h-5 w-5 text-muted-foreground" />; break;
     }
-    return (<Tooltip><TooltipTrigger asChild><span>{icon}</span></TooltipTrigger><TooltipContent><p>{textoTooltip}</p></TooltipContent></Tooltip>);
+    // CORRIGIDO: Adicionado o 'return' que estava faltando
+    return (
+        <Tooltip>
+            <TooltipTrigger asChild><span>{icon}</span></TooltipTrigger>
+            <TooltipContent><p>{textoTooltip}</p></TooltipContent>
+        </Tooltip>
+    );
 };
 
-// --- NOVO SUB-COMPONENTE PARA OS DETALHES OPERACIONAIS ---
 const DetalhesOperacionais = ({ cliente }: { cliente: AnaliseCompleta }) => (
-    <div className="p-4 bg-muted/50 grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4 text-sm">
+    <div className="grid grid-cols-2 gap-4 bg-muted/50 p-4 text-sm md:grid-cols-4 lg:grid-cols-5">
         <div className="space-y-1"><p className="font-semibold text-muted-foreground">Score Risco</p><p className="tabular-nums">{cliente.scoreRisco.toFixed(2)}</p></div>
         <div className="space-y-1"><p className="font-semibold text-muted-foreground">Score Valor</p><p className="tabular-nums">{cliente.scoreValor.toFixed(2)}</p></div>
         <div className="space-y-1"><p className="font-semibold text-muted-foreground">IVE</p><p className="tabular-nums">{cliente.ive.toFixed(2)}</p></div>
@@ -69,14 +73,21 @@ const DetalhesOperacionais = ({ cliente }: { cliente: AnaliseCompleta }) => (
     </div>
 );
 
-export const TabelaResultados = ({ resultados, isPending, isError }: TabelaResultadosProps) => {
+
+export const TabelaResultados = ({ filtrosIniciais }: TabelaResultadosProps) => {
     const [view, setView] = useState<'carteira' | 'semanal'>('carteira');
     const [sortConfig, setSortConfig] = useState<{ key: SortableKeys; direction: 'asc' | 'desc' } | null>({ key: 'ive', direction: 'desc' });
-
-    // --- MUDANÇA: Adicionado estado para controlar as linhas expandidas ---
     const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
 
-    // SUA LÓGICA ORIGINAL DE ORDENAÇÃO (PRESERVADA)
+    const { data, fetchNextPage, hasNextPage, isFetchingNextPage, isPending, isError } = useInfiniteQuery({
+        queryKey: ['analiseCredito', filtrosIniciais],
+        queryFn: ({ pageParam = 1 }) => fetchAnaliseCredito({ ...filtrosIniciais, pagina: pageParam }),
+        getNextPageParam: (lastPage) => lastPage.proximaPagina,
+        initialPageParam: 1,
+        staleTime: 1000 * 60 * 5,
+    });
+
+    const resultados = useMemo(() => data?.pages.flatMap(page => page.itens) ?? [], [data]);
     const sortedResultados = useMemo(() => {
         let sortableItems = [...resultados];
         if (sortConfig !== null) {
@@ -114,19 +125,20 @@ export const TabelaResultados = ({ resultados, isPending, isError }: TabelaResul
         </TableHead>
     );
 
-    // --- MUDANÇA: Ajustado o colSpan para o novo número de colunas (8) ---
+    // --- CORREÇÃO: A função 'renderContent' foi movida para antes de ser chamada ---
     const renderContent = (colSpan: number) => {
-        if (isPending) {
+        if (isPending && !data) {
             return (<TableRow><TableCell colSpan={colSpan}><div className="space-y-2 p-4">{[...Array(10)].map((_, i) => <Skeleton key={i} className="h-8 w-full" />)}</div></TableCell></TableRow>);
         }
         if (isError) {
-            return (<TableRow><TableCell colSpan={colSpan} className="text-center text-red-500 py-10"><div className="flex items-center justify-center"><AlertCircle className="mr-2 h-5 w-5" /><span>Ocorreu um erro ao buscar os dados.</span></div></TableCell></TableRow>);
+            return (<TableRow><TableCell colSpan={colSpan} className="py-10 text-center text-red-500"><div className="flex items-center justify-center"><AlertCircle className="mr-2 h-5 w-5" /><span>Ocorreu um erro ao buscar os dados.</span></div></TableCell></TableRow>);
         }
-        if (sortedResultados.length === 0) {
-            return (<TableRow><TableCell colSpan={colSpan} className="text-center text-muted-foreground py-10">Nenhum resultado encontrado para os filtros selecionados.</TableCell></TableRow>);
+        if (!isPending && sortedResultados.length === 0) {
+            return (<TableRow><TableCell colSpan={colSpan} className="py-10 text-center text-muted-foreground">Nenhum resultado encontrado para os filtros selecionados.</TableCell></TableRow>);
         }
         return null;
     };
+    
     const tableContent = renderContent(view === 'carteira' ? 8 : 12);
 
     return (
@@ -140,12 +152,12 @@ export const TabelaResultados = ({ resultados, isPending, isError }: TabelaResul
                     </ToggleGroup>
                 </CardHeader>
                 <CardContent>
-                    <div className="relative w-full border rounded-md max-h-[70vh] overflow-auto">
+                    <div className="relative w-full overflow-auto rounded-md border max-h-[70vh]">
                         <Table>
-                            <TableHeader className="sticky top-0 bg-background z-10">
+                            <TableHeader className="sticky top-0 z-10 bg-background">
                                 {view === 'carteira' ? (
                                     <TableRow>
-                                        <TableHead className="w-[50px] sticky left-0 bg-background"></TableHead> {/* Cabeçalho para o botão de expandir */}
+                                        <TableHead className="sticky left-0 w-[50px] bg-background"></TableHead>
                                         <SortableHeader columnKey="clienteId">Cliente</SortableHeader>
                                         <SortableHeader columnKey="nomeCliente">Nome do Cliente</SortableHeader>
                                         <SortableHeader columnKey="classificacaoEstrelas">Classificação</SortableHeader>
@@ -176,18 +188,21 @@ export const TabelaResultados = ({ resultados, isPending, isError }: TabelaResul
                                     sortedResultados.map((r) => (
                                         <React.Fragment key={r.clienteId}>
                                             <TableRow>
-                                                {/* --- MUDANÇA: Adicionada célula com o botão de expandir e colunas fixas --- */}
                                                 <TableCell className="sticky left-0 bg-background">
                                                     <Button variant="ghost" size="sm" onClick={() => setExpandedRows(prev => ({ ...prev, [r.clienteId]: !prev[r.clienteId] }))}>
                                                         {expandedRows[r.clienteId] ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                                                     </Button>
                                                 </TableCell>
-                                                <TableCell className="sticky left-[50px] bg-background">{r.clienteId}</TableCell>
-                                                <TableCell className="sticky left-[150px] bg-background">{r.nomeCliente}</TableCell>
+                                                <TableCell className="sticky left-[50px] bg-background font-medium">
+                                                    <Link href={`/cliente/${r.clienteId}`} className="hover:underline">{r.clienteId}</Link>
+                                                </TableCell>
+                                                <TableCell className="sticky left-[150px] bg-background">
+                                                    <Link href={`/cliente/${r.clienteId}`} className="hover:underline">{r.nomeCliente}</Link>
+                                                </TableCell>
                                                 <TableCell><RenderEstrelas classificacao={r.classificacaoEstrelas} /></TableCell>
                                                 <TableCell>{r.segmento}</TableCell>
                                                 <TableCell>
-                                                    <div className={cn("font-semibold text-center tabular-nums", {
+                                                    <div className={cn("text-center font-semibold tabular-nums", {
                                                         "text-red-500 dark:text-red-400": r.probabilidadeInadimplencia > 0.7,
                                                         "text-yellow-500 dark:text-yellow-400": r.probabilidadeInadimplencia > 0.4 && r.probabilidadeInadimplencia <= 0.7,
                                                     })}>
@@ -197,7 +212,6 @@ export const TabelaResultados = ({ resultados, isPending, isError }: TabelaResul
                                                 <TableCell className="text-right tabular-nums">{formatCurrency(r.saldoDevedor)}</TableCell>
                                                 <TableCell className="text-center tabular-nums">{r.titulosVencidos}</TableCell>
                                             </TableRow>
-                                            {/* --- MUDANÇA: Renderização condicional da linha de detalhes --- */}
                                             {expandedRows[r.clienteId] && (
                                                 <TableRow>
                                                     <TableCell colSpan={8} className="p-0">
@@ -208,14 +222,9 @@ export const TabelaResultados = ({ resultados, isPending, isError }: TabelaResul
                                         </React.Fragment>
                                     )) :
                                     sortedResultados.map((r) => (
-                                        <TableRow key={r.clienteId}>
-                                            <TableCell className="sticky left-0 bg-background"> {/* <-- Adicionado bg-background */}
-                                                <Button variant="ghost" size="sm" onClick={() => setExpandedRows(prev => ({ ...prev, [r.clienteId]: !prev[r.clienteId] }))}>
-                                                    {expandedRows[r.clienteId] ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                                                </Button>
-                                            </TableCell>
-                                            <TableCell className="sticky left-[50px] bg-background">{r.clienteId}</TableCell> {/* <-- Adicionado bg-background */}
-                                            <TableCell className="sticky left-[150px] bg-background">{r.nomeCliente}</TableCell> {/* <-- Adicionado bg-background */}
+                                        <TableRow key={r.clienteId} className="group">
+                                            <TableCell className="sticky left-0 bg-background group-hover:bg-muted/50 font-medium">{r.clienteId}</TableCell>
+                                            <TableCell className="sticky left-[100px] bg-background group-hover:bg-muted/50 w-[300px] truncate">{r.nomeCliente}</TableCell>
                                             <TableCell><RenderEstrelas classificacao={r.classificacaoEstrelas} /></TableCell>
                                             <TableCell><div className="flex justify-center"><RenderTendencia tendencia={r.tendencia} /></div></TableCell>
                                             <TableCell className="text-right tabular-nums">{formatCurrency(r.valorSemana1)}</TableCell>
@@ -230,6 +239,11 @@ export const TabelaResultados = ({ resultados, isPending, isError }: TabelaResul
                                     ))
                                 )}
                             </TableBody>
+                            <TabelaFooter
+                                onLoadMore={fetchNextPage}
+                                hasNextPage={!!hasNextPage}
+                                isFetchingNextPage={isFetchingNextPage}
+                            />
                         </Table>
                     </div>
                 </CardContent>

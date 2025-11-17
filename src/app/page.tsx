@@ -1,68 +1,212 @@
-// Caminho: src/app/page.tsx
+// Caminho: app/page.tsx
 'use client';
 
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import Link from 'next/link';
+import {
+  fetchDashboardSummary,
+  fetchDistribuicaoClassificacao,
+  fetchDistribuicaoSegmento,
+  fetchTopClientesValor,
+  fetchTopClientesRisco
+} from '@/http/api'; // <-- Corrigi o caminho (estava @/http/api)
 import { useFilterStore } from '@/store/use-filter-store';
 import { AnaliseCreditoFiltros } from '@/types/analise-credito';
-import { fetchDashboardSummary, fetchDistribuicaoClassificacao, fetchDistribuicaoSegmento, fetchTopClientesValor, fetchTopClientesRisco } from '@/http/api';
-import { FiltrosForm } from '@/components/analise/FiltrosForm';
+
 import { DashboardSummaryView } from '@/components/dashboard/DashboardSummary';
 import { GraficoDeDistribuicao } from '@/components/dashboard/GraficoDeDistribuicao';
 import { ListaTopClientes } from '@/components/dashboard/ListaTopClientes';
 import { LegendaInsights } from '@/components/documentacao/LegendaInsights';
 import { PainelConfiguracoes } from '@/components/configuracao/PainelConfiguracoes';
 import { Button } from '@/components/ui/button';
-import { Settings, ExternalLink } from 'lucide-react';
-import { Toaster } from "@/components/ui/sonner";
+import { Settings, BarChartHorizontal, Search } from 'lucide-react';
+import Link from 'next/link';
+import { TabelaStatus } from '@/components/analise/tabela-resultados/TabelaStatus';
+import { LineChart } from 'lucide-react' 
+import { FiltrosForm } from '@/components/analise/FiltrosForm';
 
 export default function DashboardPage() {
-  const { filtros, isSearchActive, setFiltros, setIsSearchActive } = useFilterStore();
-
-  const { data: summaryData, isLoading: isSummaryLoading } = useQuery({ queryKey: ['dashboardSummary', filtros], queryFn: () => fetchDashboardSummary(filtros), enabled: isSearchActive });
-  const { data: classificacaoData, isLoading: isClassificacaoLoading } = useQuery({ queryKey: ['distribuicaoClassificacao', filtros], queryFn: () => fetchDistribuicaoClassificacao(filtros), enabled: isSearchActive });
-  const { data: segmentoData, isLoading: isSegmentoLoading } = useQuery({ queryKey: ['distribuicaoSegmento', filtros], queryFn: () => fetchDistribuicaoSegmento(filtros), enabled: isSearchActive });
-  const { data: topValorData, isLoading: isTopValorLoading, isError: isTopValorError } = useQuery({ queryKey: ['topClientesValor', filtros], queryFn: () => fetchTopClientesValor(filtros), enabled: isSearchActive });
-  const { data: topRiscoData, isLoading: isTopRiscoLoading, isError: isTopRiscoError } = useQuery({ queryKey: ['topClientesRisco', filtros], queryFn: () => fetchTopClientesRisco(filtros), enabled: isSearchActive });
-
-  const handleSearch = (novosFiltros: Omit<AnaliseCreditoFiltros, 'pagina' | 'tamanhoPagina'>) => {
-    setFiltros(novosFiltros);
-    setIsSearchActive(true);
-  };
+  // --- CORREÇÃO v6.1 ---
+  // 'filtros' (do store) são os filtros "rascunho" do formulário.
+  const { filtros, setFiltros } = useFilterStore();
   
-  const analiseUrl = `/analise?${new URLSearchParams(filtros as Record<string, string>).toString()}`;
+  // 'activeFilters' são os filtros que o usuário *buscou*. As queries dependem deste.
+  const [activeFilters, setActiveFilters] = useState<AnaliseCreditoFiltros>(filtros);
+  
+  // 'isSearchActive' controla se a busca já foi feita
+  const [isSearchActive, setIsSearchActive] = useState(false);
+  
+  // 'isSearching' controla o estado de loading do botão
+  const [isSearching, setIsSearching] = useState(false);
+
+  const handleSearch = () => {
+    // 1. "Commita" os filtros do formulário (store) para os filtros ativos da página
+    setActiveFilters(filtros);
+    // 2. Ativa o dashboard
+    setIsSearchActive(true);
+    // 3. (Opcional) Reseta a página da tabela de análise para 1
+    setFiltros({ ...filtros, pagina: 1 });
+  };
+  // --- FIM DA CORREÇÃO ---
+
+  // Query 1: Resumo do Dashboard
+  const { data: summaryData, isLoading: isLoadingSummary } = useQuery({
+    queryKey: ['dashboardSummary', activeFilters], // Depende de activeFilters
+    queryFn: () => fetchDashboardSummary(activeFilters),
+    enabled: isSearchActive, // Só roda se a busca for ativa
+    staleTime: 1000 * 60 * 5, // 5 minutos
+  });
+
+  // Query 2: Gráfico de Classificação
+  const { data: classificacaoData, isLoading: isLoadingClassificacao } = useQuery({
+    queryKey: ['distribuicaoClassificacao', activeFilters], // Depende de activeFilters
+    queryFn: () => fetchDistribuicaoClassificacao(activeFilters),
+    enabled: isSearchActive,
+    staleTime: 1000 * 60 * 5,
+  });
+
+  // Query 3: Gráfico de Segmento
+  const { data: segmentoData, isLoading: isLoadingSegmento } = useQuery({
+    queryKey: ['distribuicaoSegmento', activeFilters], // Depende de activeFilters
+    queryFn: () => fetchDistribuicaoSegmento(activeFilters),
+    enabled: isSearchActive,
+    staleTime: 1000 * 60 * 5,
+  });
+
+  // Query 4: Top Clientes por Valor
+  const { data: topValorData, isLoading: isLoadingTopValor } = useQuery({
+    queryKey: ['topClientesValor', activeFilters], // Depende de activeFilters
+    queryFn: () => fetchTopClientesValor(activeFilters),
+    enabled: isSearchActive,
+    staleTime: 1000 * 60 * 5,
+  });
+
+  // Query 5: Top Clientes por Risco
+  const { data: topRiscoData, isLoading: isLoadingTopRisco } = useQuery({
+    queryKey: ['topClientesRisco', activeFilters], // Depende de activeFilters
+    queryFn: () => fetchTopClientesRisco(activeFilters),
+    enabled: isSearchActive,
+    staleTime: 1000 * 60 * 5,
+  });
+
+  // O isLoading agora é controlado pelas queries individuais
+  const isLoading = (isLoadingSummary || isLoadingClassificacao || isLoadingSegmento || isLoadingTopValor || isLoadingTopRisco) && isSearchActive;
+
+  // --- CORREÇÃO: Passando os filtros corretos para o link de Análise ---
+  const createAnaliseUrl = () => {
+    // Usa os filtros ATIVOS para construir o link
+    const filtrosCorrigidos: Record<string, string> = {};
+    for (const [key, value] of Object.entries(activeFilters)) {
+      if (value !== undefined && value !== null) {
+        // Converte 'classificacaoEstrelas' para 'ClassificacaoEstrelas' se existir
+        const newKey = key === 'classificacaoEstrelas' ? 'ClassificacaoEstrelas' : key;
+        filtrosCorrigidos[newKey] = String(value);
+      }
+    }
+    
+    const params = new URLSearchParams(filtrosCorrigidos);
+    return `/analise?${params.toString()}`;
+  };
 
   return (
-    <>
-      <Toaster richColors position="top-right" />
-      <div className="container mx-auto p-4 space-y-8">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          <h1 className="text-3xl font-bold">Dashboard Gerencial</h1>
-          <div className="flex items-center gap-2">
-              <LegendaInsights />
-              <PainelConfiguracoes><Button variant="outline" size="icon" aria-label="Abrir Configurações"><Settings className="h-4 w-4" /></Button></PainelConfiguracoes>
-          </div>
+    <div className="container mx-auto p-4 md:p-6 space-y-6">
+      
+      
+      <header className="flex flex-col md:flex-row md:items-center md:justify-between space-y-4 md:space-y-0">
+        <h1 className="text-3xl font-bold tracking-tight">Dashboard Gerencial (Crédito)</h1>
+        <div className="flex items-center space-x-2">
+          
+          {/* --- Link para Comercial --- */}
+          <Button asChild variant="outline">
+            <Link href="/comercial">
+              <BarChartHorizontal className="mr-2 h-4 w-4" />
+              Inteligência Comercial
+            </Link>
+          </Button>
+          
+          {/* --- ADIÇÃO: Link para a nova página S&OP (v5.0) --- */}
+          <Button asChild variant="outline" size="sm">
+            <Link href="/oportunidades">
+              <LineChart className="mr-2 h-4 w-4" />
+              Oportunidades S&OP
+            </Link>
+          </Button>
+          {/* --- FIM DA ADIÇÃO --- */}
+          
+          <LegendaInsights />
+          <PainelConfiguracoes>
+            <Button variant="outline" size="icon" aria-label="Configurações">
+              <Settings className="h-4 w-4" />
+            </Button>
+          </PainelConfiguracoes>
         </div>
-        
-        <FiltrosForm onSearch={handleSearch} isSearching={isSummaryLoading || isClassificacaoLoading} />
+      </header>
 
-        {isSearchActive && (
-          <>
-            <DashboardSummaryView summaryData={summaryData} isLoading={isSummaryLoading} />
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              <GraficoDeDistribuicao title="Distribuição por Classificação" data={classificacaoData} isLoading={isClassificacaoLoading} />
-              <GraficoDeDistribuicao title="Distribuição por Segmento" data={segmentoData} isLoading={isSegmentoLoading} />
+      {/* --- FILTROS (CORRIGIDO) --- */}
+      <FiltrosForm
+        // As props 'initialFiltros' e 'onFiltrosChange' foram removidas
+        // pois o componente agora usa o Zustand store diretamente.
+        onSearch={handleSearch}
+        isSearching={isLoading} // Passa o estado de loading
+        // showSopFilters é 'false' por padrão, o que está correto para esta página.
+      />
+
+      {/* --- BOTÃO DE ANÁLISE OPERACIONAL --- */}
+      {isSearchActive && (
+        <div className="flex justify-end">
+          <Button asChild size="lg">
+            <Link href={createAnaliseUrl()}>
+              <Search className="mr-2 h-5 w-5" />
+              Ver Análise Operacional Detalhada
+            </Link>
+          </Button>
+        </div>
+      )}
+
+      {/* --- CONTEÚDO DO DASHBOARD --- */}
+      {!isSearchActive ? (
+        <div className="flex h-[40vh] items-center justify-center rounded-lg border border-dashed">
+          <p className="text-muted-foreground">Execute uma busca para carregar o dashboard.</p>
+        </div>
+      ) : (
+        <TabelaStatus isPending={isLoading} isError={false} hasData={!!summaryData}>
+          <div className="space-y-6">
+            {/* KPIs */}
+            <DashboardSummaryView
+              summaryData={summaryData}
+              isLoading={isLoadingSummary}
+            />
+            {/* Gráficos Principais */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <GraficoDeDistribuicao
+                title="Distribuição por Classificação"
+                data={classificacaoData}
+                isLoading={isLoadingClassificacao}
+              />
+              <GraficoDeDistribuicao
+                title="Distribuição por Segmento"
+                data={segmentoData}
+                isLoading={isLoadingSegmento}
+              />
             </div>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                <ListaTopClientes title="Top 5 Clientes de Valor (maior IVE)" data={topValorData} isLoading={isTopValorLoading} isError={isTopValorError} />
-                <ListaTopClientes title="Top 5 Clientes de Risco (maior Prob. Inadimplência)" data={topRiscoData} isLoading={isTopRiscoLoading} isError={isTopRiscoError} />
+            {/* Listas Top 5 */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <ListaTopClientes
+                title="Top 5 Clientes (Maior Valor)"
+                data={topValorData}
+                isLoading={isLoadingTopValor}
+                isError={false}
+              />
+              <ListaTopClientes
+                title="Top 5 Clientes (Maior Risco)"
+                data={topRiscoData}
+                isLoading={isLoadingTopRisco}
+                isError={false}
+              />
             </div>
-            <div className="text-center pt-4">
-                <Button asChild size="lg"><Link href={analiseUrl}>Ver Análise Completa da Carteira <ExternalLink className="ml-2 h-4 w-4" /></Link></Button>
-            </div>
-          </>
-        )}
-      </div>
-    </>
+          </div>
+        </TabelaStatus>
+      )}
+    </div>
   );
 }

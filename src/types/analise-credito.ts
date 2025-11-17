@@ -7,15 +7,27 @@ export interface AnaliseCreditoFiltros {
   comNotaDeCredito?: boolean;
   dataInicial?: string;
   dataFinal?: string;
-  classificacaoEstrelas?: number | null;
   pagina?: number;
   tamanhoPagina?: number;
   VendedorId?: string;
   EquipeId?: string;
   Estado?: string;
+  // --- ADICIONE ESTAS DUAS PROPRIEDADES (v5.0) ---
+  dataReferencia?: string; // Usado no filtro de Categoria
+  grupoCanal?: string;    // Usado no filtro de Categoria e Oportunidades
   Municipio?: string;
   SituacaoCredito?: string;
-  ClassificacaoEstrelas?: number | null;
+  
+  // --- ALTERAÇÃO AQUI (v6.1) ---
+  // A API já aceitava, mas agora o frontend precisa dele no tipo principal
+  ClassificacaoEstrelas?: number | null; 
+  
+  // --- ADIÇÃO AQUI (v6.1) ---
+  Regiao?: string; // Para "Norte Goiano", "Sul Goiano", etc.
+  
+  // --- ADIÇÕES v6.1 (Tabela Operacional) ---
+  sortBy?: string;
+  sortDirection?: string;
 }
 
 // DTO completo, incluindo dados gerais e semanais
@@ -67,12 +79,18 @@ export interface DashboardSummary {
   totalLimiteCredito: number;
   totalSaldoDisponivel: number;
   distribuicaoEstrelas: Record<string, number>;
+  totalCobrança: number;
 }
 
+// --- ALTERAÇÃO AQUI (v6.1) ---
+// Atualizado para refletir a nova estrutura da API
 export interface PaginatedResponse<T> {
   itens: T[];
-  proximaPagina: number | null;
+  totalCount: number;
+  totalPages: number;
+  proximaPagina?: number | null;
 }
+// --- FIM DA ALTERAÇÃO ---
 
 // DTO para os pesos de configuração da análise
 export interface Configuracao {
@@ -95,3 +113,151 @@ export type TopClienteDto = {
   valorPrincipal: number;
   labelValor: string; // Ex: "IVE" ou "Prob. Inadimplência"
 };
+
+// ... (todos os seus tipos existentes como AnaliseCreditoFiltros, AnaliseCompleta, etc., continuam aqui)
+
+// --- NOVOS TIPOS ADICIONADOS AQUI ---
+
+// Documentação: Representa a estrutura de um único título em aberto, vindo da API.
+// Corresponde à entidade 'Titrec' do backend.
+export type Titulo = {
+  titrecId: number;
+  cdClien: number;
+  situacao: string;
+  sitCnab: string;
+  tpTit: string;
+  dtVenc: string; // Datas vêm como string no formato ISO (ex: "2025-10-28T00:00:00")
+  dtEmis: string;
+  ultimoPagamento: string | null;
+  valor: number;
+  vlJuros: number | null;
+  vlMulta: number | null;
+  vlDesconto: number | null;
+  vlAbatimento: number | null;
+  vlPago: number;
+};
+
+// Documentação: Representa um ponto de dados para o gráfico de histórico de compras.
+// Corresponde ao 'HistoricoComprasDto' do backend.
+export type HistoricoCompras = {
+  ano: number;
+  mes: number;
+  valorTotal: number;
+};
+
+// Documentação: Representa a estrutura completa do DTO de detalhes do cliente.
+// Corresponde ao 'ClienteDetalheDto' do backend.
+export type ClienteDetalhe = {
+  cdClien: number;
+  razaoSocial: string;
+  nomeFantasia: string;
+  cnpj: string;
+  situacaoCredito: string;
+  limiteCredito: number;
+  dataCadastro: string | null;
+  valorEmAberto: number;
+  valorVencido: number;
+  titulosVencidos: number;
+  atrasoMedio: number;
+  maiorCompra: number;
+  dataUltimaCompra: string | null;
+  historicoCompras: HistoricoCompras[];
+  titulos: Titulo[];
+};
+
+export interface PerformanceGeral {
+  faturamentoTotal: number;
+  ticketMedio: number;
+  numeroDePedidos: number;
+  clientesPositivados: number;
+  margemMediaPercentual: number;
+}
+
+/**
+ * Corresponde ao DTO 'RankingProdutoDto' da API.
+ * Usado para os gráficos e tabelas de ranking de produtos.
+ */
+export interface RankingProduto {
+  produtoId: number;
+  descricaoProduto: string;
+  valorTotalVendido: number;
+  quantidadeTotalVendida: number;
+  custoTotal: number;
+  margemTotal: number;
+}
+
+export interface DnaCategoria {
+  idCategoria: string;
+  descricaoCategoria: string;
+  grupoCanal: string;
+  clienteCompra: boolean;
+  valorTotalVendido: number;
+  quantidadeTotalVendida: number;
+  margemTotal: number;
+  margemPercentual: number;
+  dataUltimaCompra: string | null; // Datas vêm como string ISO
+}
+
+export interface DnaProduto {
+  idProduto: number;
+  descricaoProduto: string;
+  descricaoFabricante: string;
+  valorTotalVendido: number;
+  quantidadeTotalVendida: number;
+  margemPercentual: number;
+}
+
+export interface AnaliseMixFabricante {
+  idFabricante: string;
+  descricaoFabricante: string | null;
+  grupoCanal: string;
+  idTabelaPreco: string;
+  quantidadeTotal: number;
+  frequenciaTotal: number;
+  qtdProdutosCompradosDoMix: number;
+}
+
+// --- ADICIONE ESTA NOVA INTERFACE ---
+export type AnaliseMixProduto = {
+  idProduto: number
+  descricaoProduto: string | null
+  grupoCanal: string
+  idTabelaPreco: string
+  quantidadeTotal: number
+  frequenciaTotal: number
+  dataUltimaCompra: string | null // Datas vêm como string do JSON
+}
+
+// --- ADICIONE ESTA NOVA INTERFACE ---
+export type OportunidadeMix = {
+  idFabricante: string
+  descricaoFabricante: string | null
+  grupoCanal: string
+  idVendedor: string | null
+  nomeVendedor: string | null
+  quantidadeTotal: number
+  clientesAtendidos: number
+  skuComprados: number
+}
+// --- FIM DA ADIÇÃO ---
+
+// --- ADIÇÕES v6.1 (Novos DTOs da API) ---
+export type KpisGerenciaisDto = {
+  valorTotalVendido: number;
+  margemMediaPercentual: number;
+  clientesPositivados: number;
+  skusUnicosVendidos: number;
+};
+
+export type VisaoCategoriaDto = {
+  categoria: string;
+  valorTotalVendido: number;
+  margemMediaPercentual: number;
+};
+
+export type VisaoCanalDto = {
+  canal: string;
+  valorTotalVendido: number;
+  margemMediaPercentual: number;
+};
+// --- FIM DA ADIÇÃO ---
