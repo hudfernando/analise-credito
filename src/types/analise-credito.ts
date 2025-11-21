@@ -12,22 +12,20 @@ export interface AnaliseCreditoFiltros {
   VendedorId?: string;
   EquipeId?: string;
   Estado?: string;
-  // --- ADICIONE ESTAS DUAS PROPRIEDADES (v5.0) ---
+  ClassificacaoEstrelas?: number | null;
   dataReferencia?: string; // Usado no filtro de Categoria
   grupoCanal?: string;    // Usado no filtro de Categoria e Oportunidades
   Municipio?: string;
   SituacaoCredito?: string;
-  
-  // --- ALTERAÇÃO AQUI (v6.1) ---
-  // A API já aceitava, mas agora o frontend precisa dele no tipo principal
-  ClassificacaoEstrelas?: number | null; 
-  
-  // --- ADIÇÃO AQUI (v6.1) ---
   Regiao?: string; // Para "Norte Goiano", "Sul Goiano", etc.
-  
-  // --- ADIÇÕES v6.1 (Tabela Operacional) ---
   sortBy?: string;
   sortDirection?: string;
+  groupBy?: string; // NOVO! Parâmetro para a Super Tabela
+ 
+  TabelaPrecoId?: string;
+  FabricanteId?: string;
+  OrigemPedidoId?: string;
+  ProdutoId?: string; // Caso não tenha
 }
 
 // DTO completo, incluindo dados gerais e semanais
@@ -260,4 +258,66 @@ export type VisaoCanalDto = {
   valorTotalVendido: number;
   margemMediaPercentual: number;
 };
-// --- FIM DA ADIÇÃO ---
+
+
+export interface AnaliseUnificadaDto {
+    chave: string;
+    descricao: string;
+    valorTotalVendido: number;
+    margemTotal: number;
+    margemPercentual: number;
+    quantidadeTotal: number;
+    precoMedio: number;
+    clientesAtendidos: number;
+    mixProdutos: number;
+}
+
+// --- ADIÇÃO: DTO para Oportunidades Quentes (DNA) ---
+export interface OportunidadeQuenteDto {
+    idCategoria: string;
+    descricaoCategoria: string;
+    totalClientesPeerGroup: number;
+    percentualAdesaoPeerGroup: number; // Ex: 0.85 (85%)
+}
+
+export interface DetalheOportunidadeDto {
+    categoria: string;
+    potencial: number;
+}
+
+export interface OportunidadeClienteDto {
+    clienteId: number;
+    nomeCliente: string;
+    oportunidades: DetalheOportunidadeDto[]; // Agora é uma lista!
+    potencialTotal: number;
+    percentualAdesaoMedio: number;
+}
+
+export interface DashboardOportunidadeDto {
+    totalOportunidades: number;
+    valorPotencialTotal: number;
+    topOportunidades: OportunidadeClienteDto[];
+}
+
+export interface GeoAnaliseDto {
+    municipio: string;
+    uf: string;
+    mesorregiao: string;
+    valorTotalVendido: number;
+    clientesAtivos: number;
+    populacao: number;
+    pibPerCapita: number;
+    vendaPerCapita: number;      // R$ vendidos por habitante
+    marketShareEstimado: number; // Penetração estimada
+}
+
+// --- ADIÇÃO MOTOR 5A ---
+export interface OportunidadeOlDto {
+    clienteId: number;
+    nomeCliente: string;
+    fabricante: string;
+    valorCompraVarejo: number; // Quanto ele gasta "errado"
+    valorCompraOl: number;
+    status: string; // "Risco de Fuga"
+    acaoSugerida: string;
+}

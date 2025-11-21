@@ -22,20 +22,22 @@ import { Button } from '@/components/ui/button';
 import { Settings, BarChartHorizontal, Search } from 'lucide-react';
 import Link from 'next/link';
 import { TabelaStatus } from '@/components/analise/tabela-resultados/TabelaStatus';
-import { LineChart } from 'lucide-react' 
+import { LineChart } from 'lucide-react'
 import { FiltrosForm } from '@/components/analise/FiltrosForm';
+import { CardOportunidadesGeral } from '@/components/dashboard/CardOportunidadesGeral';
+import { CardOportunidadeOl } from '@/components/dashboard/CardOportunidadeOl';
 
 export default function DashboardPage() {
   // --- CORREÇÃO v6.1 ---
   // 'filtros' (do store) são os filtros "rascunho" do formulário.
   const { filtros, setFiltros } = useFilterStore();
-  
+
   // 'activeFilters' são os filtros que o usuário *buscou*. As queries dependem deste.
   const [activeFilters, setActiveFilters] = useState<AnaliseCreditoFiltros>(filtros);
-  
+
   // 'isSearchActive' controla se a busca já foi feita
   const [isSearchActive, setIsSearchActive] = useState(false);
-  
+
   // 'isSearching' controla o estado de loading do botão
   const [isSearching, setIsSearching] = useState(false);
 
@@ -103,19 +105,19 @@ export default function DashboardPage() {
         filtrosCorrigidos[newKey] = String(value);
       }
     }
-    
+
     const params = new URLSearchParams(filtrosCorrigidos);
     return `/analise?${params.toString()}`;
   };
 
   return (
     <div className="container mx-auto p-4 md:p-6 space-y-6">
-      
-      
+
+
       <header className="flex flex-col md:flex-row md:items-center md:justify-between space-y-4 md:space-y-0">
         <h1 className="text-3xl font-bold tracking-tight">Dashboard Gerencial (Crédito)</h1>
         <div className="flex items-center space-x-2">
-          
+
           {/* --- Link para Comercial --- */}
           <Button asChild variant="outline">
             <Link href="/comercial">
@@ -123,7 +125,7 @@ export default function DashboardPage() {
               Inteligência Comercial
             </Link>
           </Button>
-          
+
           {/* --- ADIÇÃO: Link para a nova página S&OP (v5.0) --- */}
           <Button asChild variant="outline" size="sm">
             <Link href="/oportunidades">
@@ -131,8 +133,22 @@ export default function DashboardPage() {
               Oportunidades S&OP
             </Link>
           </Button>
-          {/* --- FIM DA ADIÇÃO --- */}
-          
+
+          <Button asChild variant="outline" size="sm">
+            <Link href="/visoes/regional">
+              <LineChart className="mr-2 h-4 w-4" />
+              Visões Estratégicas
+            </Link>
+          </Button>
+
+          {/* --- ADIÇÃO CRÍTICA: Link para a Visão Unificada (v7.0) --- */}
+          <Button asChild variant="default" size="sm">
+            <Link href="/analise/unificada">
+              <Settings className="mr-2 h-4 w-4" />
+              Visão Unificada
+            </Link>
+          </Button>
+
           <LegendaInsights />
           <PainelConfiguracoes>
             <Button variant="outline" size="icon" aria-label="Configurações">
@@ -144,12 +160,19 @@ export default function DashboardPage() {
 
       {/* --- FILTROS (CORRIGIDO) --- */}
       <FiltrosForm
-        // As props 'initialFiltros' e 'onFiltrosChange' foram removidas
-        // pois o componente agora usa o Zustand store diretamente.
         onSearch={handleSearch}
-        isSearching={isLoading} // Passa o estado de loading
-        // showSopFilters é 'false' por padrão, o que está correto para esta página.
+        isSearching={isLoading}
+        showSopFilters={false} // Mantém os filtros de crédito
       />
+
+      {/* --- ÁREA DE DESTAQUE: RADAR DE OPORTUNIDADES --- */}
+        {/* Só mostramos se houver oportunidades carregadas */}
+        <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+             <CardOportunidadesGeral filtros={activeFilters} />
+        </div>
+
+        {/* Cards de Resumo (Totais, Limites, Cobrança) */}
+        <DashboardSummaryView summaryData={summaryData} isLoading={isLoading} />
 
       {/* --- BOTÃO DE ANÁLISE OPERACIONAL --- */}
       {isSearchActive && (
@@ -189,6 +212,7 @@ export default function DashboardPage() {
                 isLoading={isLoadingSegmento}
               />
             </div>
+           
             {/* Listas Top 5 */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <ListaTopClientes

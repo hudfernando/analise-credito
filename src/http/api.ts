@@ -20,7 +20,12 @@ import {
   KpisGerenciaisDto,
   VisaoCategoriaDto,
   VisaoCanalDto,
-  OportunidadeMix
+  OportunidadeMix,
+  AnaliseUnificadaDto,
+  OportunidadeQuenteDto,
+  DashboardOportunidadeDto,
+  GeoAnaliseDto,
+  OportunidadeOlDto
   // --- FIM DA ADIÇÃO ---
 } from '@/types/analise-credito';
 
@@ -32,14 +37,18 @@ const api = ky.create({
   timeout: 60000, // Timeout de 60 segundos
 });
 
-// Transforma o objeto de filtros em search params, removendo valores nulos/vazios
+// Transforma o objeto de filtros em search params, removendo valores nulos/vazios/undefined
 const createSearchParams = (filters: AnaliseCreditoFiltros): URLSearchParams => {
   const searchParams = new URLSearchParams();
   Object.entries(filters).forEach(([key, value]) => {
-    // --- ALTERAÇÃO AQUI ---
-    // Precisamos permitir '0' (ex: ClassificacaoEstrelas = 0 para Inativos)
-    if (value !== undefined && value !== null && value !== '') {
-    // --- FIM DA ALTERAÇÃO ---
+    // CORREÇÃO: Verifica se o valor é válido E se não é a string "undefined" ou "null"
+    if (
+        value !== undefined && 
+        value !== null && 
+        value !== '' && 
+        value !== 'undefined' && // <--- BLINDAGEM AQUI
+        value !== 'null'         // <--- BLINDAGEM AQUI
+    ) {
       searchParams.append(key, String(value));
     }
   });
@@ -162,6 +171,7 @@ export async function fetchMunicipios(filtros: {
   estado?: string; 
   equipeId?: string; 
   vendedorId?: string; 
+  regiao?: string;
 }): Promise<string[]> {
   
   const searchParams = new URLSearchParams();
@@ -288,4 +298,46 @@ export async function fetchOportunidadesDetalhesPaginado(filters: AnaliseCredito
 export async function fetchOportunidadesDetalhesExport(filters: AnaliseCreditoFiltros): Promise<OportunidadeMix[]> {
   const searchParams = createSearchParams(filters);
   return await api.get('comercial/oportunidades/detalhes/exportar', { searchParams }).json<OportunidadeMix[]>();
+}
+
+// --- ADIÇÃO FINAL V7.0 (VISÃO UNIFICADA) ---
+/**
+ * Busca os dados agrupados dinamicamente para a Super-Tabela (v7.0).
+ * Este é o endpoint que usa o 'groupBy'.
+ */
+export async function fetchAnaliseUnificada(
+  filters: AnaliseCreditoFiltros, 
+  groupBy: string
+): Promise<PaginatedResponse<AnaliseUnificadaDto>> {
+  
+  // 1. Cria search params com todos os filtros padrão
+  const searchParams = createSearchParams(filters); 
+  
+  // 2. Adiciona o parâmetro de agrupamento
+  searchParams.append('groupBy', groupBy); 
+  
+  // 3. Chama o novo endpoint (que é paginado)
+  return await api.get('comercial/unificada', { searchParams }).json<PaginatedResponse<AnaliseUnificadaDto>>();
+}
+
+// --- ADIÇÃO: Busca as oportunidades geradas pelo algoritmo ---
+export async function fetchOportunidadesQuentes(clienteId: number): Promise<OportunidadeQuenteDto[]> {
+    return await api.get(`credito/${clienteId}/oportunidades-quentes`).json<OportunidadeQuenteDto[]>();
+}
+
+export async function fetchOportunidadesDashboard(filters: AnaliseCreditoFiltros): Promise<DashboardOportunidadeDto> {
+  const searchParams = createSearchParams(filters);
+  return await api.get('comercial/oportunidades/dashboard', { searchParams }).json<DashboardOportunidadeDto>();
+}
+
+// --- ADIÇÃO MOTOR 3 (GEOGRAFIA) ---
+export async function fetchAnaliseRegional(filters: AnaliseCreditoFiltros): Promise<GeoAnaliseDto[]> {
+  const searchParams = createSearchParams(filters);
+  return await api.get('geo/analise-regional', { searchParams }).json<GeoAnaliseDto[]>();
+}
+
+// --- ADIÇÃO MOTOR 5A ---
+export async function fetchOportunidadesOl(filters: AnaliseCreditoFiltros): Promise<OportunidadeOlDto[]> {
+  const searchParams = createSearchParams(filters);
+  return await api.get('comercial/oportunidades/ol', { searchParams }).json<OportunidadeOlDto[]>();
 }

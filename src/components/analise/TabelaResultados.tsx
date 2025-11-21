@@ -81,10 +81,15 @@ export const TabelaResultados = ({ filtrosIniciais }: TabelaResultadosProps) => 
 
     const { data, fetchNextPage, hasNextPage, isFetchingNextPage, isPending, isError } = useInfiniteQuery({
         queryKey: ['analiseCredito', filtrosIniciais],
-        queryFn: ({ pageParam = 1 }) => fetchAnaliseCredito({ ...filtrosIniciais, pagina: pageParam }),
+        queryFn: ({ pageParam = 1 }) => fetchAnaliseCredito({ 
+            ...filtrosIniciais, 
+            pagina: pageParam as number, 
+            tamanhoPagina: 50
+        }),
         getNextPageParam: (lastPage) => lastPage.proximaPagina,
         initialPageParam: 1,
         staleTime: 1000 * 60 * 5,
+        
     });
 
     const resultados = useMemo(() => data?.pages.flatMap(page => page.itens) ?? [], [data]);

@@ -1,3 +1,4 @@
+// Caminho: src/app/cliente/[id]/page.tsx
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
@@ -8,11 +9,14 @@ import { AlertTriangle, Loader2, ArrowLeft } from 'lucide-react';
 import { ClienteDetalheHeader } from '@/components/cliente/ClienteDetalheHeader';
 import { HistoricoComprasChart } from '@/components/cliente/HistoricoComprasChart';
 import { TabelaTitulosAbertos } from '@/components/cliente/TabelaTitulosAbertos';
+// --- NOVO IMPORT ---
+
 
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { DnaCompraCliente } from '@/components/cliente/DnaCompraCliente';
 import { AnaliseMixFabricante } from '@/components/cliente/AnaliseMixFabricante';
+import { OportunidadesCard } from '../OportunidadesCard';
 
 export default function ClienteDetalhePage() {
   const params = useParams();
@@ -38,7 +42,6 @@ export default function ClienteDetalhePage() {
     );
   }
 
-  // CORREÇÃO: Adicionamos a verificação !cliente aqui, como na minha sugestão anterior
   if (isError || !cliente) {
     return (
         <div className="flex h-[calc(100vh-8rem)] items-center justify-center flex-col gap-4">
@@ -71,25 +74,29 @@ export default function ClienteDetalhePage() {
         </Button>
       </div>
 
-      {/* Não precisamos mais da verificação {cliente && ...} aqui,
-        pois a guarda 'if (isError || !cliente)' acima já protege todo o return.
-      */}
       <>
+        {/* 1. Cabeçalho Financeiro e Cadastral */}
         <ClienteDetalheHeader cliente={cliente} />
-        <HistoricoComprasChart historico={cliente.historicoCompras} />
-        <TabelaTitulosAbertos titulos={cliente.titulos} />
+
+        {/* 2. MOTOR PREDITIVO: Oportunidades Quentes (O Oráculo) */}
+        {/* Inserido aqui para que o vendedor veja O QUE VENDER imediatamente */}
+        <OportunidadesCard clienteId={cliente.cdClien} />
+
+        {/* 3. Histórico e Operacional */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <HistoricoComprasChart historico={cliente.historicoCompras} />
+            <div className="space-y-4">
+                <h3 className="text-lg font-semibold leading-none tracking-tight">Títulos em Aberto</h3>
+                <TabelaTitulosAbertos titulos={cliente.titulos} />
+            </div>
+        </div>
         
-        {/* O erro não acontece mais, pois 'cliente' está 100% definido */}
+        {/* 4. Análise de Mix (DNA de Compra) */}
         <DnaCompraCliente clienteId={cliente.cdClien} />
 
-      <div className="grid grid-cols-1 gap-4">
-        {/* CORREÇÃO: 
-          Passamos 'cliente.cdClien' (o ID do cliente) 
-          e o convertemos para 'string' para garantir 
-          que o tipo seja o esperado pelo componente.
-        */}
-        <AnaliseMixFabricante clienteId={String(cliente.cdClien)} />
-      </div>
+        <div className="grid grid-cols-1 gap-4">
+            <AnaliseMixFabricante clienteId={String(cliente.cdClien)} />
+        </div>
       </>
       
     </div>
